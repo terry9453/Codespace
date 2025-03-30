@@ -1,0 +1,14 @@
+version: 1.0
+
+runtime:
+  cpu: 2 vCPU          # 根據需求調整 CPU 和記憶體
+  memory: 2 GB
+
+build:
+  commands:
+    - docker build -t myapp .  # 替換為您的構建命令
+
+run:
+  command: docker run -p 8080:8080 myapp  # 替換為運行命令
+  network:
+    port: 8080                # 指定容器監聽的端口

@@ -4,35 +4,60 @@ import json
 import os
 
 app = FastAPI()
+
+# 設定資料存放目錄（改成專案內的 data 資料夾，避免權限問題）
+DATA_DIR = "./data"
+os.makedirs(DATA_DIR, exist_ok=True)  # 確保資料夾存在
+
+# 根路由，當用戶訪問根目錄時顯示歡迎訊息
 @app.get("/")
-async def root():
-    return {"message": "Hello from FastAPI!"}
+async def read_root():
+    return {"message": "Welcome to the FastAPI Server!"}
 
-class UserData(BaseModel):
-    user_id: int
-    username: str
+# 定義 User 資料模型
+class User(BaseModel):
+    user_id: str
+    name: str
+    age: int
     email: str
-    # 其他您需要儲存的資料欄位
 
-@app.post("/user/add/")
-async def save_data(data: UserData):
+# 1️⃣ POST: 儲存使用者資料
+@app.post("/user/add")
+async def add_user(user: User):
+    file_path = os.path.join(DATA_DIR, f"{user.user_id}.json")
+
+    # 檢查檔案是否已存在
+    if os.path.exists(file_path):
+        raise HTTPException(status_code=400, detail="使用者 ID 已存在")
+
+    # 儲存資料
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(user.dict(), f, indent=4)
+
+    return {"message": "使用者已成功儲存", "user_id": user.user_id}
+
+# 2️⃣ GET: 取得所有使用者列表
+@app.get("/users")
+async def list_users():
     try:
-        # 將資料轉換為 JSON 格式 
-        data_json = data.dict()
-
-        # 設定儲存檔案的路徑和名稱
-        filename = f"user_{data.user_id}.json"
-        filepath = os.path.join("data", filename) # 將檔案儲存到 "data" 資料夾中
-
-        # 檢查資料夾是否存在，如果不存在則建立
-        if not os.path.exists("data"):
-            os.makedirs("data")
-
-        # 將資料儲存到檔案中
-        with open(filepath, "w") as f:
-            json.dump(data_json, f)
-
-        return {"message": f"Data saved to {filename}"}
-
+        users = [f.replace(".json", "") for f in os.listdir(DATA_DIR) if f.endswith(".json")]
+        return {"users": users}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"讀取使用者列表時發生錯誤: {str(e)}")
+
+# 3️⃣ GET: 取得指定使用者資訊
+@app.get("/users/{user_id}")
+async def get_user(user_id: str):
+    file_path = os.path.join(DATA_DIR, f"{user_id}.json")
+
+    # 檢查檔案是否存在
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="使用者不存在")
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            user_data = json.load(f)
+        return user_data
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="使用者資料檔案格式錯誤")
+
